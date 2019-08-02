@@ -1,0 +1,4 @@
+plugins:
+  jira_issue_enabled:
+    default: true
+    client: true
