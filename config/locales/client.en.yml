@@ -1,3 +1,12 @@
 en:
   js:
     jira_issue:
+      jira_category_heading:: "Jira Settings"
+      jira_url: "Jira server base URL"
+      jira_user: "Jira username for API access"
+      jira_pass: "Jira password for API access"
+      jira_project_key: "Key for Project to post to"
+      jira_issuetype: "Issue type to create"
+      jira_tag_field: "Jira Custom field key (e.g., customfield_12345 -- it will begin with 'customfield')"
+      jira_tag_group: "Discourse Tag group value to insert into custom field"
+      jira_create_issue: "Should an issue be created for this category?"

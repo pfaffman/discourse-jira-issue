@@ -14,3 +14,7 @@ as the plugin command.
 
 If you have issues or suggestions for the plugin, please bring them up on
 [Discourse Meta](https://meta.discourse.org).
+
+# NOTE: USE THIS URL TO GET THE CUSTOM FIELD KEYS (replace SDD with the project key)
+
+http://jira.literatecomputing.com:8080/rest/api/2/issue/createmeta?projectKeys=SDD&expand=projects.issuetypes.fields

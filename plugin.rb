@@ -2,7 +2,7 @@
 # about: Create Jira Issue for all topics in a category
 # version: 0.1
 # authors: pfaffman
-# url: https://github.com/pfaffman
+# url: https://github.com/pfaffman/discourse-jira-issue
 
 register_asset "stylesheets/common/jira-issue.scss"
 register_asset "stylesheets/desktop/jira-issue.scss"
@@ -21,17 +21,18 @@ after_initialize do
            'jira_pass',
            'jira_project_key',
            'jira_issuetype',
-           'jira_tag_field'
+           'jira_tag_field',
+           'jira_tag_group'
          ]
 
   ccfs.each do |ccf|
-    Category.register_custom_field_type(ccf, :boolean)
+    Category.register_custom_field_type(ccf, :string)
     Site.preloaded_category_custom_fields << ccf if Site.respond_to? :preloaded_category_custom_fields
-    add_to_serializer(:basic_category, :default_tags) { object.custom_fields[ccf] }
+    add_to_serializer(:basic_category, ccf.to_sym) { object.custom_fields[ccf] }
   end
-  Category.register_custom_field_type('jira_create_issue', :string)
+  Category.register_custom_field_type('jira_create_issue', :boolean)
   Site.preloaded_category_custom_fields << 'jira_create_issue' if Site.respond_to? :preloaded_category_custom_fields
-  add_to_serializer(:basic_category, :default_tags) { object.custom_fields['jira_create_issue'] }
+  add_to_serializer(:basic_category, :jira_create_issue) { object.custom_fields['jira_create_issue'] }
 
   class ::Topic
     def jira_create_issue?
@@ -42,67 +43,73 @@ after_initialize do
       self.category.custom_fields['jira_url'].gsub(/\/$/, '')
     end
 
-    def jira_auth
-      return (self.category.custom_fields['jira_username'], self.category.custom_fields['jira_password'])
-    end
-
     def jira_project_key
       self.category.custom_fields['jira_project_key']
     end
 
-    def jira_jira_issuetype
-      self.category.custom_fields['jira_jira_issuetype']
+    def jira_issuetype
+      self.category.custom_fields['jira_issuetype']
     end
 
     def jira_tag_field?
-      self.category_custom_fields['jira_tag_field'].length > 0
+      self.category.custom_fields['jira_tag_field'].length > 0
     end
 
     def jira_tag_field
-      self.category_custom_fields['jira_tag_field']
+      self.category.custom_fields['jira_tag_field']
     end
 
     def jira_post_issue
-      puts "Gonna create some issue for #{self.category.custom_fields}!"
+      puts "Gonna create some issue for #{self.id}!"
 
-      if self.jira_create_issue?
-        uri = URI.parse("#{self.jira_url}/rest/api/2/issue")
+      topic = self
+      post = Post.find_by(topic_id: topic.id, post_number: 1)
+      return unless topic
+
+      if topic.jira_create_issue?
+        uri = URI.parse("#{topic.jira_url}/rest/api/2/issue")
         http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = self.jira_url[4] == 's'
+        http.use_ssl = topic.jira_url[4] == 's'
         request = Net::HTTP::Post.new(uri.request_uri,  'Content-Type' => 'application/json')
-        request.basic_auth(self.jira_auth)
+        request.basic_auth(self.category.custom_fields['jira_user'],
+                           self.category.custom_fields['jira_pass'])
 
-        if self.jira_custom_field?
+        puts "URI: #{uri}"
+
+        if topic.jira_tag_field?
         data = {"fields" =>
-                {"project" => {"key" => self.jira_project_key},
-                 "issuetype"=> {"name"=> self.jira_issuetype},
-                 self.jira_custom_field => self.tags.pluck(:name).join(", "),
-                 "summary" => "self.title",
-                 "description" => self.raw + "\n---\n" self.cooked
+                {"project" => {"key" => topic.jira_project_key},
+                 "issuetype"=> {"name"=> topic.jira_issuetype},
+                 topic.jira_tag_field => topic.tags.pluck(:name).join(", "),
+                 "summary" => topic.title,
+                 "description" => post.raw
                 }}
         else
           data = {"fields" =>
-                  {"project" => {"key" => self.jira_project_key},
-                   "issuetype"=> {"name"=> self.jira_issuetype},
-                   "summary" => "self.title",
-                   "description" => self.raw + "\n---\n" self.cooked
+                  {"project" => {"key" => topic.jira_project_key},
+                   "issuetype"=> {"name"=> topic.jira_issuetype},
+                   "summary" => topic.title,
+                   "description" => post.raw
                   }}
         end
+        puts "DATA: #{data}"
         request.body = data.to_json
         response = http.request(request)
-        puts response.body
-        end
+        puts "RESPONSE: #{response.body}"
       end
-    response
-    end
-
-    DiscourseEvent.on(:post_created) do
-      # FIX THIS
-      self.topic_tag_default_tags.each do |tag|
-        TopicTag.create(topic_id: self.id, tag_id: tag.id)
-      end
+      response
     end
   end
+
+  DiscourseEvent.on(:post_created) do |post, opts, user|
+    puts "JPI: #{post}"
+    if post.post_number == 1
+      puts "It's a topic!!!!"
+      topic = Topic.find(post.topic_id)
+      topic.jira_post_issue unless !topic
+    end
+  end
+
 
   class ::Category
     before_validation do
