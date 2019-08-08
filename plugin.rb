@@ -76,20 +76,24 @@ after_initialize do
 
         puts "URI: #{uri}"
 
+        topic_url = "#{Discourse.base_url}/t/#{topic.slug}/#{topic.id}"
+
+        description = "From Discourse: #{topic_url}\n\n#{post.raw}"
+
         if topic.jira_tag_field?
         data = {"fields" =>
                 {"project" => {"key" => topic.jira_project_key},
                  "issuetype"=> {"name"=> topic.jira_issuetype},
                  topic.jira_tag_field => topic.tags.pluck(:name).join(", "),
                  "summary" => topic.title,
-                 "description" => post.raw
+                 "description" => description
                 }}
         else
           data = {"fields" =>
                   {"project" => {"key" => topic.jira_project_key},
                    "issuetype"=> {"name"=> topic.jira_issuetype},
                    "summary" => topic.title,
-                   "description" => post.raw
+                   "description" => description
                   }}
         end
         puts "DATA: #{data}"
